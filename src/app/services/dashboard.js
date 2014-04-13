@@ -35,7 +35,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
       loader: {
         save_gist: false,
         save_elasticsearch: true,
-        save_influxdb: false,
+        save_influxdb: true,
         save_local: true,
         save_default: true,
         save_temp: true,
@@ -44,7 +44,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
         load_gist: false,
         load_elasticsearch: true,
         load_elasticsearch_size: 20,
-        load_influxdb: false,
+        load_influxdb: true,
         load_local: false,
         hide: false
       },
@@ -80,6 +80,9 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
         switch(_type) {
         case ('elasticsearch'):
           self.elasticsearch_load('dashboard',_id);
+          break;
+        case ('influxdb'):
+          self.influxdb_load('dashboard',_id);
           break;
         case ('temp'):
           self.elasticsearch_load('temp',_id);
@@ -307,6 +310,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
         url: config.elasticsearch + "/" + config.grafana_index + "/"+type+"/"+id+'?' + new Date().getTime(),
         method: "GET",
         transformResponse: function(response) {
+          console.log(response);
           return renderTemplate(angular.fromJson(response)._source.dashboard, $routeParams);
         }
       };
@@ -327,8 +331,38 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
         }
         return false;
       }).success(function(data) {
+        console.log(data);
         self.dash_load(data);
       });
+    };
+
+    this.influxdb_load = function(type, id) {
+      var query = "select title, dashboard from " + config.grafana_index + " where title = '" + id + "' limit 1";
+      return influxDatasource.doInfluxRequest(query)
+              .error(function(data, status) {
+                if(status === 0) {
+                  alertSrv.set('Error',"Could not contact InfluxDB at " + config.influxdb.url +
+                    ". Please ensure that InfluxDB is reachable from your system." ,'error');
+                } else {
+                  alertSrv.set('Error',"Could not find "+id+". If you"+
+                    " are using a proxy, ensure it is configured correctly",'error');
+                }
+                return false;
+              }).success(function (results) {
+                if (!results || !results[0]) {
+                  return;
+                }
+
+                var columns = results[0].columns;
+                var point = results[0].points[0];
+                var pt = {};
+                _.each(columns, function (col, index) {
+                  pt[col] = point[index];
+                });
+                var dash = renderTemplate(pt.dashboard, $routeParams);
+                console.log(dash);
+                self.dash_load(dash, $routeParams);
+              });
     };
 
     this.script_load = function(file) {
@@ -403,6 +437,34 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
       );
     };
 
+    this.influxdb_save = function(type,title) {
+      // Clone object so we can modify it without influencing the existing obejct
+      var save = _.clone(self.current);
+
+      // Change title on object clone
+      if (type === 'dashboard') {
+        save.title = _.isUndefined(title) ? self.current.title : title;
+      }
+
+      // Create request with id as title. Rethink this.
+      var source = {
+        title: save.title,
+        dashboard: angular.toJson(save),
+        type: type
+      };
+
+      return influxDatasource
+        .doInfluxWriteRequest(config.grafana_index, source)
+        .then(
+          function () {
+            var query = "select * from " + config.grafana_index + " where title = '" + source.title  + "' and type = '" + source.type + "' limit 1";
+            return influxDatasource.doInfluxRequest(query);
+          },
+          function () {
+            return false;
+          });
+    };
+
     this.save_gist = function(title,dashboard) {
       var save = _.clone(dashboard || self.current);
       save.title = title || self.current.title;
@@ -441,35 +503,6 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
       }, function() {
         return false;
       });
-    };
-
-    this.influxdb_save = function(type,title) {
-      // Clone object so we can modify it without influencing the existing obejct
-      var save = _.clone(self.current);
-      var id;
-
-      // Change title on object clone
-      if (type === 'dashboard') {
-        id = save.title = _.isUndefined(title) ? self.current.title : title;
-      }
-
-      // Create request with id as title. Rethink this.
-      var source = {
-        title: save.title,
-        dashboard: angular.toJson(save),
-        type: type
-      };
-
-      return influxDatasource
-        .doInfluxWriteRequest(config.grafana_index, source)
-        .then(
-          function () {
-            var query = "select title, dashboard from " + config.grafana_index + " where title = '" + source.title  + "' and type = '" + source.type + "' limit 1";
-            return influxDatasource.doInfluxRequest(query);
-          },
-          function () {
-            return false;
-          });
     };
 
     this.set_interval = function (interval) {

@@ -145,14 +145,13 @@ function (angular, _, moment) {
           return;
         }
 
+        var columns = result.data[0].columns;
         var point = result.data[0].points[0];
-        var sequenceNumber = point[1];
-
-        alertSrv.set('Dashboard Saved', 'This dashboard has been saved to InfluxDB as "' + sequenceNumber + '"','success', 5000);
-        if(type === 'temp') {
-          $scope.share = dashboard.share_link(dashboard.current.title,'temp',sequenceNumber);
-        }
-
+        var pt = {};
+        _.each(columns, function (col, index) {
+          pt[col] = point[index];
+        });
+        alertSrv.set('Dashboard Saved', 'This dashboard has been saved to InfluxDB as "' + pt.title + '"','success', 5000);
         $rootScope.$emit('dashboard-saved');
       });
     };
