@@ -87,6 +87,9 @@
         <div class="editor-option">
           <label class="small">Elasticsearch</label><input type="checkbox" ng-model="dashboard.current.loader.save_elasticsearch" ng-checked="dashboard.current.loader.save_elasticsearch">
         </div>
+        <div class="editor-option">
+          <label class="small">InfluxDB</label><input type="checkbox" ng-model="dashboard.current.loader.save_influxdb" ng-checked="dashboard.current.loader.save_influxdb">
+        </div>
       </div>
       <div class="section">
         <h5>Load from</h5>
@@ -101,6 +104,9 @@
         </div>
         <div class="editor-option" ng-show="dashboard.current.loader.load.elasticsearch">
           <label class="small">ES list size</label><input class="input-mini" type="number" ng-model="dashboard.current.loader.load_elasticsearch_size">
+        </div>
+        <div class="editor-option">
+          <label class="small">InfluxDB</label><input type="checkbox" ng-model="dashboard.current.loader.load_influxdb" ng-checked="dashboard.current.loader.load_influxdb">
         </div>
       </div>
       <div class="section">

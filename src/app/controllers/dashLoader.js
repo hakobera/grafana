@@ -15,9 +15,11 @@ function (angular, _, moment) {
       $scope.gist_pattern = /(^\d{5,}$)|(^[a-z0-9]{10,}$)|(gist.github.com(\/*.*)\/[a-z0-9]{5,}\/*$)/;
       $scope.gist = $scope.gist || {};
       $scope.elasticsearch = $scope.elasticsearch || {};
+      $scope.influxdb = $scope.influxdb || {};
 
       $rootScope.$on('save-dashboard', function() {
         $scope.elasticsearch_save('dashboard', false);
+        $scope.influxdb_save('dashboard', false);
       });
 
       $rootScope.$on('zoom-out', function() {
@@ -36,10 +38,10 @@ function (angular, _, moment) {
 
       var _l = dashboard.current.loader;
       if(type === 'load') {
-        return (_l.load_elasticsearch || _l.load_gist || _l.load_local);
+        return (_l.load_elasticsearch || _l.load_influxdb || _l.load_gist || _l.load_local);
       }
       if(type === 'save') {
-        return (_l.save_elasticsearch || _l.save_gist || _l.save_local || _l.save_default);
+        return (_l.save_elasticsearch || _l.save_influxdb || _l.save_gist || _l.save_local || _l.save_default);
       }
       if(type === 'share') {
         return (_l.save_temp);
@@ -128,6 +130,30 @@ function (angular, _, moment) {
         } else {
           alertSrv.set('Gist Failed','Could not retrieve dashboard list from gist','error',5000);
         }
+      });
+    };
+
+    $scope.influxdb_save = function(type) {
+      dashboard.influxdb_save(
+        type,
+        ($scope.influxdb.title || dashboard.current.title)
+      ).then(function(result) {
+        console.log(result);
+
+        if(_.isUndefined(result.data) || _.isUndefined(result.data[0])) {
+          alertSrv.set('Save failed','Dashboard could not be saved to InfluxDB','error',5000);
+          return;
+        }
+
+        var point = result.data[0].points[0];
+        var sequenceNumber = point[1];
+
+        alertSrv.set('Dashboard Saved', 'This dashboard has been saved to InfluxDB as "' + sequenceNumber + '"','success', 5000);
+        if(type === 'temp') {
+          $scope.share = dashboard.share_link(dashboard.current.title,'temp',sequenceNumber);
+        }
+
+        $rootScope.$emit('dashboard-saved');
       });
     };
 

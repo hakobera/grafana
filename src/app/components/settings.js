@@ -14,6 +14,7 @@ function (_, crypto) {
      */
     var defaults = {
       elasticsearch                 : "http://"+window.location.hostname+":9200",
+      influxdb                      : null,
       datasources                   : {
         default: {
           url: "http://"+window.location.hostname+":8080",

@@ -30,7 +30,7 @@ function (angular, _, kbn) {
           return [];
         }
 
-        var template = "select [[func]]([[column]]) as [[column]]_[[func]] from [[series]] where [[timeFilter]]" + 
+        var template = "select [[func]]([[column]]) as [[column]]_[[func]] from [[series]] where [[timeFilter]]" +
           " group by time([[interval]]) order asc";
 
         var templateData = {
@@ -94,6 +94,34 @@ function (angular, _, kbn) {
       return $http(options);
     };
 
+    InfluxDatasource.prototype.doInfluxWriteRequest = function (seriesName, data) {
+      var params = {
+        u: this.username,
+        p: this.password
+      };
+
+      var columns = Object.keys(data);
+      var point = _.map(columns, function(key) {
+        return data[key];
+      });
+
+      var postData = {
+        name: seriesName,
+        columns: columns,
+        points: [point]
+      };
+
+      var options = {
+        method: 'POST',
+        url:    this.url + '/series',
+        params: params,
+        data: [postData]
+      };
+
+      console.log(postData);
+      return $http(options);
+    };
+
     function handleInfluxQueryResponse(results) {
       var output = [];
 
@@ -152,7 +180,6 @@ function (angular, _, kbn) {
     function to_utc_epoch_seconds(date) {
       return (date.getTime() / 1000).toFixed(0) + 's';
     }
-
 
     return InfluxDatasource;
 

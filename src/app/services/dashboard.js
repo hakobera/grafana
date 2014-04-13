@@ -6,7 +6,8 @@ define([
   'config',
   'moment',
   'modernizr',
-  'filesaver'
+  'filesaver',
+  './influxdb/influxdbDatasource'
 ],
 function (angular, $, kbn, _, config, moment, Modernizr) {
   'use strict';
@@ -15,7 +16,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
 
   module.service('dashboard', function(
     $routeParams, $http, $rootScope, $injector, $location, $timeout,
-    ejsResource, timer, alertSrv
+    ejsResource, timer, alertSrv, InfluxDatasource
   ) {
     // A hash of defaults to use when loading a dashboard
 
@@ -34,6 +35,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
       loader: {
         save_gist: false,
         save_elasticsearch: true,
+        save_influxdb: false,
         save_local: true,
         save_default: true,
         save_temp: true,
@@ -42,6 +44,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
         load_gist: false,
         load_elasticsearch: true,
         load_elasticsearch_size: 20,
+        load_influxdb: false,
         load_local: false,
         hide: false
       },
@@ -51,6 +54,7 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
     // An elasticJS client to use
     var ejs = ejsResource(config.elasticsearch, config.elasticsearchBasicAuth);
     var gist_pattern = /(^\d{5,}$)|(^[a-z0-9]{10,}$)|(gist.github.com(\/*.*)\/[a-z0-9]{5,}\/*$)/;
+    var influxDatasource = new InfluxDatasource(config.influxdb);
 
     // Store a reference to this
     var self = this;
@@ -439,6 +443,35 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
       });
     };
 
+    this.influxdb_save = function(type,title) {
+      // Clone object so we can modify it without influencing the existing obejct
+      var save = _.clone(self.current);
+      var id;
+
+      // Change title on object clone
+      if (type === 'dashboard') {
+        id = save.title = _.isUndefined(title) ? self.current.title : title;
+      }
+
+      // Create request with id as title. Rethink this.
+      var source = {
+        title: save.title,
+        dashboard: angular.toJson(save),
+        type: type
+      };
+
+      return influxDatasource
+        .doInfluxWriteRequest(config.grafana_index, source)
+        .then(
+          function () {
+            var query = "select title, dashboard from " + config.grafana_index + " where title = '" + source.title  + "' and type = '" + source.type + "' limit 1";
+            return influxDatasource.doInfluxRequest(query);
+          },
+          function () {
+            return false;
+          });
+    };
+
     this.set_interval = function (interval) {
       self.current.refresh = interval;
       if(interval) {
@@ -453,7 +486,6 @@ function (angular, $, kbn, _, config, moment, Modernizr) {
         timer.cancel(self.refresh_timer);
       }
     };
-
 
   });
 
